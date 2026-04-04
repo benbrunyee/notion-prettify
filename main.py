@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import platform
 import sys
 
 # ---- Playwright persistent browser path (must be before all other imports) ----
@@ -18,20 +17,6 @@ if getattr(sys, "frozen", False):
     )
 # ---------------------------------------------------------------------------------
 
-# PyInstaller bundles often report an empty macOS version string; darkdetect (used by
-# customtkinter) parses platform.mac_ver()[0] and crashes with int(''). Supply a safe
-# fallback before importing the GUI stack.
-if getattr(sys, "frozen", False) and sys.platform == "darwin":
-    _orig_mac_ver = platform.mac_ver
-
-    def _mac_ver() -> tuple[str, tuple[str, str, str], str]:
-        release, info, machine = _orig_mac_ver()
-        if not release or not release.strip():
-            release = "15.0"
-        return (release, info, machine)
-
-    platform.mac_ver = _mac_ver  # type: ignore[assignment]
-
 # ---- Fix playwright browser install when frozen --------------------------------
 # browser_setup.ensure_chromium_installed() tries to locate a Python interpreter
 # via shutil.which("python3"/"python").  When the app is bundled with PyInstaller
@@ -39,9 +24,10 @@ if getattr(sys, "frozen", False) and sys.platform == "darwin":
 # Replace the function with one that invokes playwright's own bundled node.exe +
 # cli.js driver directly — no Python in PATH required.
 if getattr(sys, "frozen", False):
+    from pathlib import Path
+
     import bs_notion_export_prettify.browser_setup as _browser_setup
     import bs_notion_export_prettify.pdf_maker as _pdf_maker
-    from pathlib import Path
     from playwright._impl._driver import compute_driver_executable
 
     def _frozen_ensure_chromium_installed() -> None:

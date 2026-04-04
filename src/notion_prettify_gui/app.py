@@ -1,7 +1,23 @@
 from __future__ import annotations
 
-import customtkinter as ctk
+import sys
 
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QScrollArea,
+    QSizePolicy,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
+from notion_prettify_gui import styles
 from notion_prettify_gui.models.options import PrettifyOptions
 from notion_prettify_gui.services.runner import PrettifyRunner, RunResult, RunStatus
 from notion_prettify_gui.widgets.file_section import FileSection
@@ -9,24 +25,69 @@ from notion_prettify_gui.widgets.metadata_section import MetadataSection
 from notion_prettify_gui.widgets.options_section import OptionsSection
 
 _APP_TITLE = "Notion Export Prettify"
-_WINDOW_SIZE = "780x860"
-_LOG_HEIGHT = 200
+_APP_VERSION = "0.1.0"
+_LOG_MIN_HEIGHT = 180
 
 
-class App(ctk.CTk):
+class _RunButton(QWidget):
+    """CTA button with status label below it."""
+
+    clicked = Signal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        from PySide6.QtWidgets import QPushButton
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        self._button = QPushButton("Generate PDF")
+        self._button.setProperty("role", "primary")
+        self._button.setMinimumHeight(42)
+        self._button.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        self._button.clicked.connect(self.clicked)
+        layout.addWidget(self._button)
+
+        self._status = QLabel("")
+        self._status.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        font = QFont()
+        font.setPointSize(10)
+        self._status.setFont(font)
+        layout.addWidget(self._status)
+
+    def set_running(self, running: bool) -> None:
+        self._button.setEnabled(not running)
+        if running:
+            self._button.setText("Generating…")
+        else:
+            self._button.setText("Generate PDF")
+
+    def set_status(self, message: str, *, error: bool = False) -> None:
+        self._status.setText(message)
+        self._status.setProperty("role", "status-error" if error else "status-success")
+        self._status.style().unpolish(self._status)
+        self._status.style().polish(self._status)
+
+
+class App(QMainWindow):
     """Main application window."""
+
+    _log_signal = Signal(str)
+    _complete_signal = Signal(object)
 
     def __init__(self) -> None:
         super().__init__()
-        ctk.set_appearance_mode("system")
-        ctk.set_default_color_theme("blue")
-
-        self.title(_APP_TITLE)
-        self.geometry(_WINDOW_SIZE)
-        self.minsize(640, 600)
-        self.resizable(True, True)
+        self.setWindowTitle(_APP_TITLE)
+        self.setMinimumSize(700, 700)
+        self.resize(800, 880)
 
         self._runner = PrettifyRunner()
+
+        self._log_signal.connect(self._append_log)
+        self._complete_signal.connect(self._on_complete)
 
         self._build_ui()
 
@@ -35,104 +96,109 @@ class App(ctk.CTk):
     # ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=1)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setCentralWidget(scroll_area)
 
-        outer = ctk.CTkScrollableFrame(self, label_text="")
-        outer.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
-        outer.columnconfigure(0, weight=1)
+        container = QWidget()
+        scroll_area.setWidget(container)
 
-        self._build_header(outer)
-        self._build_sections(outer)
-        self._build_run_area(outer)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(28, 24, 28, 28)
+        layout.setSpacing(0)
 
-    def _build_header(self, parent: ctk.CTkScrollableFrame) -> None:
-        header = ctk.CTkFrame(parent, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=24, pady=(20, 4))
-        header.columnconfigure(0, weight=1)
+        layout.addWidget(self._build_header())
+        layout.addWidget(self._build_divider(), 0)
+        layout.addSpacing(16)
 
-        ctk.CTkLabel(
-            header,
-            text=_APP_TITLE,
-            font=ctk.CTkFont(size=22, weight="bold"),
-            anchor="w",
-        ).grid(row=0, column=0, sticky="w")
-        ctk.CTkLabel(
-            header,
-            text="Turn a Notion page export into a styled PDF document.",
-            font=ctk.CTkFont(size=13),
-            text_color=("gray40", "gray65"),
-            anchor="w",
-        ).grid(row=1, column=0, sticky="w", pady=(2, 0))
+        self._file_section = FileSection()
+        layout.addWidget(self._file_section)
+        layout.addSpacing(12)
 
-        ctk.CTkFrame(parent, height=1, fg_color=("gray75", "gray30")).grid(
-            row=1, column=0, sticky="ew", padx=24, pady=(12, 0)
+        self._metadata_section = MetadataSection()
+        layout.addWidget(self._metadata_section)
+        layout.addSpacing(12)
+
+        self._options_section = OptionsSection()
+        layout.addWidget(self._options_section)
+        layout.addSpacing(20)
+
+        self._run_widget = _RunButton()
+        self._run_widget.clicked.connect(self._on_run)
+        layout.addWidget(self._run_widget)
+        layout.addSpacing(12)
+
+        layout.addWidget(self._build_log_area())
+        layout.addSpacing(8)
+        layout.addStretch()
+
+    def _build_header(self) -> QWidget:
+        widget = QWidget()
+        widget.setObjectName("header")
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 12)
+        layout.setSpacing(4)
+
+        title_row = QHBoxLayout()
+        title_row.setSpacing(8)
+
+        title = QLabel(_APP_TITLE)
+        title.setProperty("role", "heading")
+        title_font = QFont()
+        title_font.setPointSize(17)
+        title_font.setWeight(QFont.Weight.Bold)
+        title.setFont(title_font)
+        title_row.addWidget(title)
+
+        version = QLabel(f"v{_APP_VERSION}")
+        version.setProperty("role", "subtitle")
+        version_font = QFont()
+        version_font.setPointSize(10)
+        version.setFont(version_font)
+        version.setAlignment(Qt.AlignmentFlag.AlignBottom)
+        title_row.addWidget(version)
+        title_row.addStretch()
+
+        layout.addLayout(title_row)
+
+        subtitle = QLabel("Turn a Notion page export into a styled PDF document.")
+        subtitle.setProperty("role", "subtitle")
+        sub_font = QFont()
+        sub_font.setPointSize(11)
+        subtitle.setFont(sub_font)
+        layout.addWidget(subtitle)
+
+        return widget
+
+    def _build_divider(self) -> QFrame:
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Plain)
+        return line
+
+    def _build_log_area(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        label = QLabel("Output")
+        label_font = QFont()
+        label_font.setPointSize(11)
+        label_font.setWeight(QFont.Weight.DemiBold)
+        label.setFont(label_font)
+        layout.addWidget(label)
+
+        self._log_box = QTextEdit()
+        self._log_box.setReadOnly(True)
+        self._log_box.setMinimumHeight(_LOG_MIN_HEIGHT)
+        self._log_box.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
+        layout.addWidget(self._log_box)
 
-    def _build_sections(self, parent: ctk.CTkScrollableFrame) -> None:
-        self._file_section = FileSection(
-            parent,
-            corner_radius=10,
-            border_width=1,
-            border_color=("gray75", "gray30"),
-        )
-        self._file_section.grid(row=2, column=0, sticky="ew", padx=24, pady=(16, 0))
-
-        self._metadata_section = MetadataSection(
-            parent,
-            corner_radius=10,
-            border_width=1,
-            border_color=("gray75", "gray30"),
-        )
-        self._metadata_section.grid(row=3, column=0, sticky="ew", padx=24, pady=(12, 0))
-
-        self._options_section = OptionsSection(
-            parent,
-            corner_radius=10,
-            border_width=1,
-            border_color=("gray75", "gray30"),
-        )
-        self._options_section.grid(row=4, column=0, sticky="ew", padx=24, pady=(12, 0))
-
-        # Add padding inside each section frame
-        for section in (self._file_section, self._metadata_section, self._options_section):
-            section.grid_configure(ipadx=16, ipady=14)
-
-    def _build_run_area(self, parent: ctk.CTkScrollableFrame) -> None:
-        run_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        run_frame.grid(row=5, column=0, sticky="ew", padx=24, pady=(16, 4))
-        run_frame.columnconfigure(0, weight=1)
-
-        self._run_button = ctk.CTkButton(
-            run_frame,
-            text="Generate PDF",
-            height=40,
-            font=ctk.CTkFont(size=14, weight="bold"),
-            command=self._on_run,
-        )
-        self._run_button.grid(row=0, column=0, sticky="ew")
-
-        self._status_label = ctk.CTkLabel(
-            run_frame,
-            text="",
-            anchor="w",
-            font=ctk.CTkFont(size=12),
-        )
-        self._status_label.grid(row=1, column=0, sticky="w", pady=(6, 0))
-
-        log_label = ctk.CTkLabel(
-            run_frame, text="Output", font=ctk.CTkFont(size=13, weight="bold"), anchor="w"
-        )
-        log_label.grid(row=2, column=0, sticky="w", pady=(12, 4))
-
-        self._log_box = ctk.CTkTextbox(
-            run_frame,
-            height=_LOG_HEIGHT,
-            font=ctk.CTkFont(family="monospace", size=12),
-            state="disabled",
-            wrap="word",
-        )
-        self._log_box.grid(row=3, column=0, sticky="ew", pady=(0, 20))
+        return widget
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -140,7 +206,9 @@ class App(ctk.CTk):
 
     def _on_run(self) -> None:
         if self._file_section.input_file is None:
-            self._set_status("Please select an input file first.", error=True)
+            self._run_widget.set_status(
+                "Please select an input file first.", error=True
+            )
             return
 
         options = PrettifyOptions(
@@ -161,52 +229,44 @@ class App(ctk.CTk):
         )
 
         self._clear_log()
-        self._set_running(True)
-        self._set_status("Running…")
+        self._run_widget.set_running(True)
+        self._run_widget.set_status("Running…")
 
         self._runner.run(
             options,
-            on_output=self._append_log_threadsafe,
-            on_complete=self._on_complete_threadsafe,
+            on_output=self._log_signal.emit,
+            on_complete=self._complete_signal.emit,
         )
 
-    def _on_complete_threadsafe(self, result: RunResult) -> None:
-        self.after(0, self._on_complete, result)
-
     def _on_complete(self, result: RunResult) -> None:
-        self._set_running(False)
+        self._run_widget.set_running(False)
         if result.status == RunStatus.SUCCESS:
-            self._set_status("Done — PDF generated successfully.", error=False)
+            self._run_widget.set_status("Done — PDF generated successfully.")
         else:
-            code_str = f" (exit code {result.return_code})" if result.return_code else ""
-            self._set_status(f"Failed{code_str}. See output below.", error=True)
+            code_str = (
+                f" (exit code {result.return_code})" if result.return_code else ""
+            )
+            self._run_widget.set_status(
+                f"Failed{code_str}. See output below.", error=True
+            )
 
     # ------------------------------------------------------------------
-    # Helpers
+    # Log helpers
     # ------------------------------------------------------------------
-
-    def _set_running(self, running: bool) -> None:
-        self._run_button.configure(state="disabled" if running else "normal")
-
-    def _set_status(self, message: str, error: bool = False) -> None:
-        color = ("red", "#ff6b6b") if error else ("green", "#6bff8e")
-        self._status_label.configure(text=message, text_color=color)
 
     def _clear_log(self) -> None:
-        self._log_box.configure(state="normal")
-        self._log_box.delete("1.0", "end")
-        self._log_box.configure(state="disabled")
-
-    def _append_log_threadsafe(self, text: str) -> None:
-        self.after(0, self._append_log, text)
+        self._log_box.clear()
 
     def _append_log(self, text: str) -> None:
-        self._log_box.configure(state="normal")
-        self._log_box.insert("end", text)
-        self._log_box.see("end")
-        self._log_box.configure(state="disabled")
+        self._log_box.moveCursor(self._log_box.textCursor().MoveOperation.End)
+        self._log_box.insertPlainText(text)
+        self._log_box.ensureCursorVisible()
 
 
 def main() -> None:
-    app = App()
-    app.mainloop()
+    app = QApplication.instance() or QApplication(sys.argv)
+    assert isinstance(app, QApplication)
+    app.setStyleSheet(styles.STYLESHEET)
+    window = App()
+    window.show()
+    sys.exit(app.exec())

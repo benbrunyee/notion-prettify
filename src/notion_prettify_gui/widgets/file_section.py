@@ -1,100 +1,116 @@
 from __future__ import annotations
 
 from pathlib import Path
-from tkinter import filedialog
 
-import customtkinter as ctk
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 
-class _FilePickerRow(ctk.CTkFrame):
+class _FilePickerRow(QWidget):
     """A label + entry + browse button row for picking a single file path."""
 
     def __init__(
         self,
-        master: ctk.CTkFrame,
         label: str,
         placeholder: str,
-        file_types: list[tuple[str, str]],
+        file_filter: str,
         save_mode: bool = False,
-        **kwargs: object,
+        parent: QWidget | None = None,
     ) -> None:
-        super().__init__(master, fg_color="transparent", **kwargs)
-        self._file_types = file_types
+        super().__init__(parent)
+        self.setProperty("role", "field-cell")
+        self._file_filter = file_filter
         self._save_mode = save_mode
 
-        self.columnconfigure(1, weight=1)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
 
-        ctk.CTkLabel(self, text=label, anchor="w", width=90).grid(
-            row=0, column=0, padx=(0, 8), sticky="w"
+        label_widget = QLabel(label)
+        label_widget.setProperty("role", "section-label")
+        layout.addWidget(label_widget)
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+
+        self._entry = QLineEdit()
+        self._entry.setPlaceholderText(placeholder)
+        self._entry.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
-        self._entry = ctk.CTkEntry(self, placeholder_text=placeholder)
-        self._entry.grid(row=0, column=1, sticky="ew", padx=(0, 8))
-        ctk.CTkButton(self, text="Browse", width=80, command=self._browse).grid(
-            row=0, column=2
-        )
+        row.addWidget(self._entry)
+
+        browse_btn = QPushButton("Browse")
+        browse_btn.setFixedWidth(72)
+        browse_btn.clicked.connect(self._browse)
+        row.addWidget(browse_btn)
+
+        layout.addLayout(row)
 
     def _browse(self) -> None:
         if self._save_mode:
-            path = filedialog.asksaveasfilename(filetypes=self._file_types)
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Save file", "", self._file_filter
+            )
         else:
-            path = filedialog.askopenfilename(filetypes=self._file_types)
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Open file", "", self._file_filter
+            )
         if path:
-            self._entry.delete(0, "end")
-            self._entry.insert(0, path)
+            self._entry.setText(path)
 
     def get(self) -> Path | None:
-        value = self._entry.get().strip()
+        value = self._entry.text().strip()
         return Path(value) if value else None
 
     def set(self, path: Path | None) -> None:
-        self._entry.delete(0, "end")
-        if path is not None:
-            self._entry.insert(0, str(path))
+        self._entry.setText(str(path) if path is not None else "")
 
 
-class FileSection(ctk.CTkFrame):
+class FileSection(QGroupBox):
     """Groups the input file, output file, and template file pickers."""
 
-    _ZIP_TYPES = [
-        ("ZIP files", "*.zip"),
-        ("HTML files", "*.html"),
-        ("All files", "*.*"),
-    ]
-    _PDF_TYPES = [("PDF files", "*.pdf"), ("All files", "*.*")]
-    _TEMPLATE_TYPES = [("Config / template files", "*.*")]
+    _ZIP_FILTER = "ZIP / HTML files (*.zip *.html);;All files (*.*)"
+    _PDF_FILTER = "PDF files (*.pdf);;All files (*.*)"
+    _TEMPLATE_FILTER = "All files (*.*)"
 
-    def __init__(self, master: ctk.CTkFrame, **kwargs: object) -> None:
-        super().__init__(master, **kwargs)
-        self.columnconfigure(0, weight=1)
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__("Files", parent)
 
-        ctk.CTkLabel(self, text="Files", font=ctk.CTkFont(size=14, weight="bold")).grid(
-            row=0, column=0, sticky="w", pady=(0, 8)
-        )
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
 
         self._input_row = _FilePickerRow(
-            self,
             label="Input file",
             placeholder="ExportBlock-*.zip or *.html from Notion",
-            file_types=self._ZIP_TYPES,
+            file_filter=self._ZIP_FILTER,
         )
-        self._input_row.grid(row=1, column=0, sticky="ew", pady=(0, 6))
+        layout.addWidget(self._input_row)
 
         self._output_row = _FilePickerRow(
-            self,
             label="Output PDF",
             placeholder="Leave blank to save alongside the input file",
-            file_types=self._PDF_TYPES,
+            file_filter=self._PDF_FILTER,
             save_mode=True,
         )
-        self._output_row.grid(row=2, column=0, sticky="ew", pady=(0, 6))
+        layout.addWidget(self._output_row)
 
         self._template_row = _FilePickerRow(
-            self,
             label="Template",
             placeholder="Optional custom template / config file",
-            file_types=self._TEMPLATE_TYPES,
+            file_filter=self._TEMPLATE_FILTER,
         )
-        self._template_row.grid(row=3, column=0, sticky="ew")
+        layout.addWidget(self._template_row)
 
     @property
     def input_file(self) -> Path | None:

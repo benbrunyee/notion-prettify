@@ -1,111 +1,114 @@
 from __future__ import annotations
 
-import customtkinter as ctk
+from PySide6.QtWidgets import (
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 _TOGGLE_FIELDS: list[tuple[str, str, str]] = [
-    # (attribute_name, label_text, tooltip_text)
-    ("cover_page", "Cover page", "Add a cover page (if defined in the template)"),
+    # (attribute_name, label_text, description)
+    ("cover_page", "Cover page", "Add a cover page defined in the template"),
     ("heading_numbers", "Heading numbers", "Prefix headings with hierarchical numbers"),
     (
         "strip_internal_info",
         "Strip internal info",
-        "Remove callouts and database properties from output",
+        "Remove callouts and database properties",
     ),
-    ("table_of_contents", "Table of contents", "Add a table of contents (if present in Notion)"),
+    ("table_of_contents", "Table of contents", "Add a ToC if present in Notion"),
 ]
 
-# Maps each switch to three states: None → unset, True → on, False → off
 _STATE_CYCLE: list[bool | None] = [None, True, False]
 _STATE_LABELS: dict[bool | None, str] = {None: "default", True: "on", False: "off"}
+_STATE_ROLES: dict[bool | None, str] = {
+    None: "toggle-default",
+    True: "toggle-on",
+    False: "toggle-off",
+}
 
 
-class _TriStateSwitch(ctk.CTkFrame):
-    """A switch that cycles through three states: default / on / off."""
+class _TriStateToggle(QWidget):
+    """A label row with a pill-shaped button cycling: default → on → off."""
 
-    def __init__(self, master: ctk.CTkFrame, label: str, tooltip: str, **kwargs: object) -> None:
-        super().__init__(master, fg_color="transparent", **kwargs)
+    def __init__(
+        self, label: str, description: str, parent: QWidget | None = None
+    ) -> None:
+        super().__init__(parent)
         self._state: bool | None = None
 
-        self.columnconfigure(1, weight=1)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
 
-        self._switch = ctk.CTkSwitch(
-            self,
-            text="",
-            width=44,
-            command=self._on_toggle,
-        )
-        self._switch.grid(row=0, column=0, padx=(0, 8))
+        text_col = QVBoxLayout()
+        text_col.setSpacing(2)
+        text_col.setContentsMargins(0, 0, 0, 0)
 
-        inner = ctk.CTkFrame(self, fg_color="transparent")
-        inner.grid(row=0, column=1, sticky="ew")
-        inner.columnconfigure(0, weight=1)
+        label_widget = QLabel(label)
+        text_col.addWidget(label_widget)
 
-        ctk.CTkLabel(inner, text=label, anchor="w").grid(row=0, column=0, sticky="w")
-        self._state_label = ctk.CTkLabel(
-            inner,
-            text="default",
-            anchor="w",
-            text_color=("gray50", "gray60"),
-            font=ctk.CTkFont(size=11),
-        )
-        self._state_label.grid(row=1, column=0, sticky="w")
+        desc_widget = QLabel(description)
+        desc_widget.setProperty("role", "hint")
+        text_col.addWidget(desc_widget)
 
-    def _on_toggle(self) -> None:
-        # The underlying CTkSwitch is binary; we use it as a trigger and
-        # cycle through our own three-state logic instead.
+        layout.addLayout(text_col, stretch=1)
+
+        self._button = QPushButton(_STATE_LABELS[self._state])
+        self._button.setProperty("role", _STATE_ROLES[self._state])
+        self._button.setFixedWidth(68)
+        self._button.clicked.connect(self._cycle)
+        layout.addWidget(self._button)
+
+    def _cycle(self) -> None:
         current_idx = _STATE_CYCLE.index(self._state)
-        next_idx = (current_idx + 1) % len(_STATE_CYCLE)
-        self._state = _STATE_CYCLE[next_idx]
-        self._sync_switch()
-
-    def _sync_switch(self) -> None:
-        if self._state is True:
-            self._switch.select()
-        else:
-            self._switch.deselect()
-        self._state_label.configure(text=_STATE_LABELS[self._state])
+        self._state = _STATE_CYCLE[(current_idx + 1) % len(_STATE_CYCLE)]
+        self._button.setText(_STATE_LABELS[self._state])
+        self._button.setProperty("role", _STATE_ROLES[self._state])
+        # Force QSS re-evaluation after dynamic property change
+        self._button.style().unpolish(self._button)
+        self._button.style().polish(self._button)
 
     @property
     def value(self) -> bool | None:
         return self._state
 
 
-class OptionsSection(ctk.CTkFrame):
+class OptionsSection(QGroupBox):
     """Four tri-state toggles for the boolean CLI flags."""
 
-    def __init__(self, master: ctk.CTkFrame, **kwargs: object) -> None:
-        super().__init__(master, **kwargs)
-        self.columnconfigure((0, 1), weight=1)
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__("Options", parent)
 
-        ctk.CTkLabel(self, text="Options", font=ctk.CTkFont(size=14, weight="bold")).grid(
-            row=0, column=0, columnspan=2, sticky="w", pady=(0, 8)
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        self._toggles: dict[str, _TriStateToggle] = {}
+        for attr, label, description in _TOGGLE_FIELDS:
+            toggle = _TriStateToggle(label=label, description=description)
+            layout.addWidget(toggle)
+            self._toggles[attr] = toggle
+
+        hint = QLabel(
+            "Button cycles: default (omit flag)  →  on (--flag)  →  off (--no-flag)"
         )
-
-        self._switches: dict[str, _TriStateSwitch] = {}
-        for idx, (attr, label, tooltip) in enumerate(_TOGGLE_FIELDS):
-            col = idx % 2
-            row = (idx // 2) + 1
-            switch = _TriStateSwitch(self, label=label, tooltip=tooltip)
-            switch.grid(row=row, column=col, sticky="ew", padx=(0, 12) if col == 0 else 0, pady=4)
-            self._switches[attr] = switch
-
-        note = "Switches cycle: default (omit flag) → on (--flag) → off (--no-flag)"
-        ctk.CTkLabel(
-            self, text=note, anchor="w", text_color=("gray50", "gray60"), font=ctk.CTkFont(size=11)
-        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        hint.setProperty("role", "hint")
+        layout.addWidget(hint)
 
     @property
     def cover_page(self) -> bool | None:
-        return self._switches["cover_page"].value
+        return self._toggles["cover_page"].value
 
     @property
     def heading_numbers(self) -> bool | None:
-        return self._switches["heading_numbers"].value
+        return self._toggles["heading_numbers"].value
 
     @property
     def strip_internal_info(self) -> bool | None:
-        return self._switches["strip_internal_info"].value
+        return self._toggles["strip_internal_info"].value
 
     @property
     def table_of_contents(self) -> bool | None:
-        return self._switches["table_of_contents"].value
+        return self._toggles["table_of_contents"].value
