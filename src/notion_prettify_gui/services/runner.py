@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import os
 import shutil
+import site
 import subprocess
+import sys
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, auto
+from pathlib import Path
 
 from notion_prettify_gui.models.options import PrettifyOptions
 from notion_prettify_gui.services.zip_handler import ZipExtractionError, ZipHandler
@@ -26,6 +29,31 @@ class RunResult:
 
 OutputCallback = Callable[[str], None]
 CompletionCallback = Callable[[RunResult], None]
+
+
+def _path_for_cli_lookup() -> str:
+    """PATH used to resolve the CLI and for subprocess env on macOS.
+
+    Apps launched from Finder receive a minimal PATH that omits Homebrew and
+    user-local script directories, so ``shutil.which`` fails even when the tool
+    is installed.
+    """
+    base = os.environ.get("PATH", "")
+    if sys.platform != "darwin":
+        return base
+    home = Path.home()
+    extra: list[str] = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        str(home / ".local" / "bin"),
+    ]
+    pyenv_root = os.environ.get("PYENV_ROOT")
+    pyenv_shims = Path(pyenv_root) / "shims" if pyenv_root else home / ".pyenv" / "shims"
+    extra.append(str(pyenv_shims))
+    user_base = site.getuserbase()
+    if user_base:
+        extra.append(str(Path(user_base) / "bin"))
+    return os.pathsep.join([*extra, base])
 
 
 class PrettifyRunner:
@@ -73,7 +101,8 @@ class PrettifyRunner:
         on_output: OutputCallback,
         on_complete: CompletionCallback,
     ) -> None:
-        executable = shutil.which(self.CLI_COMMAND)
+        path_for_cli = _path_for_cli_lookup()
+        executable = shutil.which(self.CLI_COMMAND, path=path_for_cli)
         if executable is None:
             on_output(
                 f"Error: '{self.CLI_COMMAND}' not found on PATH. "
@@ -118,13 +147,16 @@ class PrettifyRunner:
 
         return_code: int | None = None
         try:
+            proc_env = {**os.environ, "PYTHONUTF8": "1"}
+            if sys.platform == "darwin":
+                proc_env["PATH"] = path_for_cli
             self._process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                env={**os.environ, "PYTHONUTF8": "1"},
+                env=proc_env,
             )
             assert self._process.stdout is not None
             for line in self._process.stdout:
