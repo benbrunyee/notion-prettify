@@ -16,7 +16,7 @@ datas = collect_data_files("customtkinter")
 
 a = Analysis(
     ["main.py"],
-    pathex=[],
+    pathex=["src"],
     binaries=[],
     datas=datas,
     hiddenimports=[

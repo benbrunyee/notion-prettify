@@ -8,7 +8,7 @@ REM Output:
 REM   dist\NotionPrettify.exe   — single-file executable, no install needed
 REM
 REM Prerequisites:
-REM   - Python 3.x with this project installed  (pip install -e .)
+REM   - uv (https://docs.astral.sh/uv/) installed and on PATH
 REM   - notion-export-prettify available on PATH (installed separately)
 
 setlocal EnableDelayedExpansion
@@ -16,10 +16,10 @@ setlocal EnableDelayedExpansion
 REM Move to the project root regardless of where the script was invoked from
 cd /d "%~dp0\.."
 
-echo =^> Installing / upgrading PyInstaller...
-pip install --quiet --upgrade pyinstaller
+echo =^> Syncing dependencies (including build group)...
+uv sync --group build
 if errorlevel 1 (
-    echo ERROR: pip install failed. Make sure Python is on your PATH.
+    echo ERROR: uv sync failed. Make sure uv is installed and on your PATH.
     exit /b 1
 )
 
@@ -28,7 +28,7 @@ if exist build rmdir /s /q build
 if exist dist  rmdir /s /q dist
 
 echo =^> Building NotionPrettify.exe...
-pyinstaller NotionPrettify.spec
+uv run pyinstaller NotionPrettify.spec
 if errorlevel 1 (
     echo ERROR: PyInstaller build failed.
     exit /b 1

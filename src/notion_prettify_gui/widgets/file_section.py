@@ -68,7 +68,7 @@ class FileSection(ctk.CTkFrame):
         self._input_row = _FilePickerRow(
             self,
             label="Input file",
-            placeholder="Export-*.zip or *.html from Notion",
+            placeholder="ExportBlock-*.zip or *.html from Notion",
             file_types=self._ZIP_TYPES,
         )
         self._input_row.grid(row=1, column=0, sticky="ew", pady=(0, 6))
