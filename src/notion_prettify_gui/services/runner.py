@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import threading
@@ -122,6 +123,7 @@ class PrettifyRunner:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
+                env={**os.environ, "PYTHONUTF8": "1"},
             )
             assert self._process.stdout is not None
             for line in self._process.stdout:
