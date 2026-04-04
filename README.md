@@ -1,6 +1,6 @@
 # Notion Export Prettify GUI
 
-A desktop GUI wrapper for the [`notion-export-prettify`](https://github.com/nicholasgmm/notion-export-prettify) CLI tool. Point it at a Notion export (ZIP or HTML), fill in a few metadata fields, toggle some options, and generate a styled PDF — all without touching the command line.
+A desktop GUI wrapper for the [`notion-export-prettify`](https://github.com/wabiloo/notion-export-prettify) CLI tool. Point it at a Notion export (ZIP or HTML), fill in a few metadata fields, toggle some options, and generate a styled PDF — all without touching the command line.
 
 ## Features
 
@@ -19,7 +19,7 @@ A desktop GUI wrapper for the [`notion-export-prettify`](https://github.com/nich
 | `notion-export-prettify` | Must be installed and on your `PATH` |
 | `uv` (recommended) | For managing the virtual environment and dependencies |
 
-Install the CLI tool first. Refer to the [notion-export-prettify documentation](https://github.com/nicholasgmm/notion-export-prettify) for installation instructions.
+Install the CLI tool first. Refer to the [notion-export-prettify documentation](https://github.com/wabiloo/notion-export-prettify) for installation instructions.
 
 ## Installation
 
