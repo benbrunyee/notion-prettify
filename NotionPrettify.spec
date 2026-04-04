@@ -9,17 +9,20 @@ Run via the build scripts in scripts/, or directly with:
 """
 
 import sys
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 # customtkinter ships theme JSON files and images that must travel with the binary.
 datas = collect_data_files("customtkinter")
+# PyInstaller does not always follow customtkinter imports; force the full package tree.
+_hidden_customtkinter = collect_submodules("customtkinter")
 
 a = Analysis(
     ["main.py"],
     pathex=["src"],
     binaries=[],
     datas=datas,
-    hiddenimports=[
+    hiddenimports=_hidden_customtkinter
+    + [
         # tkinter backend modules sometimes need explicit inclusion
         "tkinter",
         "tkinter.ttk",
