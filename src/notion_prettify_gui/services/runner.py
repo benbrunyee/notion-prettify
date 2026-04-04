@@ -116,6 +116,7 @@ class PrettifyRunner:
         cmd = [executable, *cli_args]
         on_output(f"$ {' '.join(cmd)}\n\n")
 
+        return_code: int | None = None
         try:
             self._process = subprocess.Popen(
                 cmd,
@@ -134,7 +135,32 @@ class PrettifyRunner:
             on_complete(RunResult(RunStatus.FAILED))
             return
         finally:
+            # Move PDF out of the temp extraction dir before it is deleted.
+            if return_code == 0 and options.output is None:
+                self._relocate_pdf(options, on_output)
             self._zip_handler.cleanup()
 
         status = RunStatus.SUCCESS if return_code == 0 else RunStatus.FAILED
         on_complete(RunResult(status=status, return_code=return_code))
+
+    def _relocate_pdf(self, options: PrettifyOptions, on_output: OutputCallback) -> None:
+        """Move a PDF written into the temp extraction dir to the original input's directory.
+
+        Called only when no explicit output path was given and the run succeeded.
+        Has no effect when no temp extraction dir was created (input was already an
+        ExportBlock-*.zip or an HTML file — in that case the PDF is already in the
+        right place).
+        """
+        extraction_dir = self._zip_handler.extraction_dir
+        if extraction_dir is None or options.input_file is None:
+            return
+
+        pdfs = list(extraction_dir.glob("*.pdf"))
+        if not pdfs:
+            return
+
+        destination_dir = options.input_file.parent
+        for pdf in pdfs:
+            dest = destination_dir / pdf.name
+            shutil.move(str(pdf), str(dest))
+            on_output(f"PDF saved to: {dest}\n")

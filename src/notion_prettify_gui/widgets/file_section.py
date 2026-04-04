@@ -29,7 +29,9 @@ class _FilePickerRow(ctk.CTkFrame):
         )
         self._entry = ctk.CTkEntry(self, placeholder_text=placeholder)
         self._entry.grid(row=0, column=1, sticky="ew", padx=(0, 8))
-        ctk.CTkButton(self, text="Browse", width=80, command=self._browse).grid(row=0, column=2)
+        ctk.CTkButton(self, text="Browse", width=80, command=self._browse).grid(
+            row=0, column=2
+        )
 
     def _browse(self) -> None:
         if self._save_mode:
@@ -53,7 +55,11 @@ class _FilePickerRow(ctk.CTkFrame):
 class FileSection(ctk.CTkFrame):
     """Groups the input file, output file, and template file pickers."""
 
-    _ZIP_TYPES = [("ZIP files", "*.zip"), ("HTML files", "*.html"), ("All files", "*.*")]
+    _ZIP_TYPES = [
+        ("ZIP files", "*.zip"),
+        ("HTML files", "*.html"),
+        ("All files", "*.*"),
+    ]
     _PDF_TYPES = [("PDF files", "*.pdf"), ("All files", "*.*")]
     _TEMPLATE_TYPES = [("Config / template files", "*.*")]
 
@@ -76,7 +82,7 @@ class FileSection(ctk.CTkFrame):
         self._output_row = _FilePickerRow(
             self,
             label="Output PDF",
-            placeholder="Leave blank to use document title",
+            placeholder="Leave blank to save alongside the input file",
             file_types=self._PDF_TYPES,
             save_mode=True,
         )

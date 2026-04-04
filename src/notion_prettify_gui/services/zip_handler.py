@@ -57,6 +57,11 @@ class ZipHandler:
 
         return matches[0]
 
+    @property
+    def extraction_dir(self) -> Path | None:
+        """The temporary directory used for ZIP extraction, or None if unused."""
+        return Path(self._temp_dir.name) if self._temp_dir is not None else None
+
     def cleanup(self) -> None:
         """Remove any temporary extraction directory."""
         if self._temp_dir is not None:
