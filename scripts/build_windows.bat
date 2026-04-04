@@ -45,7 +45,11 @@ if exist "%EXE_PATH%" (
     echo   Right-click dist\NotionPrettify.exe ^> Send to ^> Desktop ^(create shortcut^)
     echo.
     echo NOTE: notion-export-prettify must still be installed and on PATH.
-    echo       The GUI app launches it as a subprocess.
+    echo       After installing it, also run:
+    echo         python -m playwright install chromium
+    echo       using the same Python where notion-export-prettify is installed.
+    echo       The GUI app launches notion-export-prettify as a subprocess,
+    echo       which uses Playwright + Chromium to render the PDF.
 ) else (
     echo ERROR: Build completed but %EXE_PATH% was not found.
     exit /b 1
