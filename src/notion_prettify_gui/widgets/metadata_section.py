@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-import customtkinter as ctk
+from PySide6.QtWidgets import (
+    QGridLayout,
+    QGroupBox,
+    QLabel,
+    QLineEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 _METADATA_FIELDS: list[tuple[str, str, str]] = [
     # (attribute_name, label_text, placeholder)
@@ -14,39 +21,45 @@ _METADATA_FIELDS: list[tuple[str, str, str]] = [
 ]
 
 
-class MetadataSection(ctk.CTkFrame):
+class MetadataSection(QGroupBox):
     """Two-column grid of labelled text entry fields for document metadata."""
 
-    def __init__(self, master: ctk.CTkFrame, **kwargs: object) -> None:
-        super().__init__(master, **kwargs)
-        self.columnconfigure((0, 1), weight=1)
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__("Metadata", parent)
 
-        ctk.CTkLabel(self, text="Metadata", font=ctk.CTkFont(size=14, weight="bold")).grid(
-            row=0, column=0, columnspan=2, sticky="w", pady=(0, 8)
-        )
+        grid = QGridLayout(self)
+        grid.setHorizontalSpacing(16)
+        grid.setVerticalSpacing(12)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
 
-        self._entries: dict[str, ctk.CTkEntry] = {}
-        for idx, (attr, label, placeholder) in enumerate(_METADATA_FIELDS):
+        self._entries: dict[str, QLineEdit] = {}
+        for idx, (attr, label_text, placeholder) in enumerate(_METADATA_FIELDS):
             col = idx % 2
-            row = (idx // 2) + 1
-            frame = ctk.CTkFrame(self, fg_color="transparent")
-            frame.grid(row=row, column=col, sticky="ew", padx=(0, 8) if col == 0 else 0, pady=3)
-            frame.columnconfigure(0, weight=1)
+            row = idx // 2
 
-            ctk.CTkLabel(frame, text=label, anchor="w").grid(
-                row=0, column=0, sticky="w", pady=(0, 2)
-            )
-            entry = ctk.CTkEntry(frame, placeholder_text=placeholder)
-            entry.grid(row=1, column=0, sticky="ew")
+            cell = QWidget()
+            cell.setProperty("role", "field-cell")
+            cell_layout = QVBoxLayout(cell)
+            cell_layout.setContentsMargins(0, 0, 0, 0)
+            cell_layout.setSpacing(4)
+
+            label = QLabel(label_text)
+            label.setProperty("role", "section-label")
+            cell_layout.addWidget(label)
+
+            entry = QLineEdit()
+            entry.setPlaceholderText(placeholder)
+            cell_layout.addWidget(entry)
+
             self._entries[attr] = entry
+            grid.addWidget(cell, row, col)
 
     def get(self, field: str) -> str:
-        return str(self._entries[field].get()).strip()
+        return self._entries[field].text().strip()
 
     def set(self, field: str, value: str) -> None:
-        entry = self._entries[field]
-        entry.delete(0, "end")
-        entry.insert(0, value)
+        self._entries[field].setText(value)
 
     @property
     def title(self) -> str:
