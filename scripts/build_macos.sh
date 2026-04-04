@@ -9,7 +9,6 @@
 #
 # Prerequisites:
 #   - Python 3.x with this project and dependencies installed  (pip install -e .)
-#   - notion-export-prettify available on PATH (installed separately)
 
 set -euo pipefail
 
@@ -57,13 +56,6 @@ if [ -d "$APP_PATH" ]; then
     echo "  • First launch: right-click the app → Open → Open (trusts this unsigned build)."
     echo "  • Or run:  xattr -cr /Applications/NotionPrettify.app"
     echo "  • If it still quits immediately, see:  ~/Library/Logs/NotionPrettify/crash.log"
-    echo ""
-    echo "NOTE: notion-export-prettify must still be installed and on PATH."
-    echo "      After installing it, also run:"
-    echo "        python -m playwright install chromium"
-    echo "      using the same Python where notion-export-prettify is installed."
-    echo "      The GUI app launches notion-export-prettify as a subprocess,"
-    echo "      which uses Playwright + Chromium to render the PDF."
 else
     echo "Build failed — $APP_PATH not found." >&2
     exit 1

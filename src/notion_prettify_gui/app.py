@@ -3,11 +3,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from notion_prettify_gui.models.options import PrettifyOptions
-from notion_prettify_gui.services.runner import (
-    PrettifyRunner,
-    RunResult,
-    RunStatus,
-)
+from notion_prettify_gui.services.runner import PrettifyRunner, RunResult, RunStatus
 from notion_prettify_gui.widgets.file_section import FileSection
 from notion_prettify_gui.widgets.metadata_section import MetadataSection
 from notion_prettify_gui.widgets.options_section import OptionsSection
@@ -107,30 +103,14 @@ class App(ctk.CTk):
         run_frame.grid(row=5, column=0, sticky="ew", padx=24, pady=(16, 4))
         run_frame.columnconfigure(0, weight=1)
 
-        button_row = ctk.CTkFrame(run_frame, fg_color="transparent")
-        button_row.grid(row=0, column=0, sticky="ew")
-        button_row.columnconfigure(0, weight=1)
-
         self._run_button = ctk.CTkButton(
-            button_row,
+            run_frame,
             text="Generate PDF",
             height=40,
             font=ctk.CTkFont(size=14, weight="bold"),
             command=self._on_run,
         )
-        self._run_button.grid(row=0, column=0, sticky="ew", padx=(0, 8))
-
-        self._cancel_button = ctk.CTkButton(
-            button_row,
-            text="Cancel",
-            height=40,
-            width=90,
-            fg_color=("gray70", "gray30"),
-            hover_color=("gray60", "gray40"),
-            command=self._on_cancel,
-            state="disabled",
-        )
-        self._cancel_button.grid(row=0, column=1)
+        self._run_button.grid(row=0, column=0, sticky="ew")
 
         self._status_label = ctk.CTkLabel(
             run_frame,
@@ -190,10 +170,6 @@ class App(ctk.CTk):
             on_complete=self._on_complete_threadsafe,
         )
 
-    def _on_cancel(self) -> None:
-        self._runner.cancel()
-        self._set_status("Cancelling…")
-
     def _on_complete_threadsafe(self, result: RunResult) -> None:
         self.after(0, self._on_complete, result)
 
@@ -211,7 +187,6 @@ class App(ctk.CTk):
 
     def _set_running(self, running: bool) -> None:
         self._run_button.configure(state="disabled" if running else "normal")
-        self._cancel_button.configure(state="normal" if running else "disabled")
 
     def _set_status(self, message: str, error: bool = False) -> None:
         color = ("red", "#ff6b6b") if error else ("green", "#6bff8e")

@@ -13,8 +13,15 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 # customtkinter ships theme JSON files and images that must travel with the binary.
 datas = collect_data_files("customtkinter")
+datas += collect_data_files("bs_notion_export_prettify")
+# playwright bundles its own node.exe + JS driver package.  These are required so
+# that ensure_chromium_installed() can invoke the driver to download Chromium at
+# runtime without spawning sys.executable (which is the frozen app itself).
+datas += collect_data_files("playwright")
+
 # PyInstaller does not always follow customtkinter imports; force the full package tree.
 _hidden_customtkinter = collect_submodules("customtkinter")
+_hidden_bs_prettify = collect_submodules("bs_notion_export_prettify")
 
 a = Analysis(
     ["main.py"],
@@ -22,11 +29,16 @@ a = Analysis(
     binaries=[],
     datas=datas,
     hiddenimports=_hidden_customtkinter
+    + _hidden_bs_prettify
     + [
         # tkinter backend modules sometimes need explicit inclusion
         "tkinter",
         "tkinter.ttk",
         "tkinter.filedialog",
+        # playwright is used by bs_notion_export_prettify for PDF rendering
+        "playwright",
+        "playwright.sync_api",
+        "bs_notion_export_prettify",
     ],
     hookspath=[],
     hooksconfig={},
@@ -34,10 +46,6 @@ a = Analysis(
     excludes=[
         # Trim unused heavy stdlib modules to shrink the bundle
         "unittest",
-        "email",
-        "html",
-        "http",
-        "xml",
         "pydoc",
     ],
     noarchive=False,
