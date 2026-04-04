@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import os
-import shutil
-import site
-import subprocess
-import sys
+import contextlib
+import io
+import logging
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
+
+from bs_notion_export_prettify import prettify
 
 from notion_prettify_gui.models.options import PrettifyOptions
 from notion_prettify_gui.services.zip_handler import ZipExtractionError, ZipHandler
@@ -31,42 +31,37 @@ OutputCallback = Callable[[str], None]
 CompletionCallback = Callable[[RunResult], None]
 
 
-def _path_for_cli_lookup() -> str:
-    """PATH used to resolve the CLI and for subprocess env on macOS.
+class _TextCallback(io.TextIOBase):
+    """Forwards write() calls to an OutputCallback."""
 
-    Apps launched from Finder receive a minimal PATH that omits Homebrew and
-    user-local script directories, so ``shutil.which`` fails even when the tool
-    is installed.
-    """
-    base = os.environ.get("PATH", "")
-    if sys.platform != "darwin":
-        return base
-    home = Path.home()
-    extra: list[str] = [
-        "/opt/homebrew/bin",
-        "/usr/local/bin",
-        str(home / ".local" / "bin"),
-    ]
-    pyenv_root = os.environ.get("PYENV_ROOT")
-    pyenv_shims = Path(pyenv_root) / "shims" if pyenv_root else home / ".pyenv" / "shims"
-    extra.append(str(pyenv_shims))
-    user_base = site.getuserbase()
-    if user_base:
-        extra.append(str(Path(user_base) / "bin"))
-    return os.pathsep.join([*extra, base])
+    def __init__(self, callback: OutputCallback) -> None:
+        self._callback = callback
+
+    def write(self, s: str) -> int:
+        if s:
+            self._callback(s)
+        return len(s)
+
+    def flush(self) -> None:
+        pass
+
+
+class _LogHandler(logging.Handler):
+    """Forwards logging records to an OutputCallback."""
+
+    def __init__(self, callback: OutputCallback) -> None:
+        super().__init__()
+        self._callback = callback
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self._callback(self.format(record) + "\n")
 
 
 class PrettifyRunner:
-    """Runs notion-export-prettify as a subprocess, streaming its output.
-
-    All I/O happens on a background thread so the UI remains responsive.
-    """
-
-    CLI_COMMAND = "notion-export-prettify"
+    """Calls bs_notion_export_prettify.prettify() on a background thread."""
 
     def __init__(self) -> None:
         self._zip_handler = ZipHandler()
-        self._process: subprocess.Popen[str] | None = None
         self._thread: threading.Thread | None = None
 
     def run(
@@ -75,10 +70,10 @@ class PrettifyRunner:
         on_output: OutputCallback,
         on_complete: CompletionCallback,
     ) -> None:
-        """Start the CLI in a background thread.
+        """Start the prettify call in a background thread.
 
-        *on_output* is called with each line of stdout/stderr.
-        *on_complete* is called once the process exits.
+        *on_output* receives each captured log/stdout line.
+        *on_complete* is called once the operation finishes.
         """
         if self._thread and self._thread.is_alive():
             raise RuntimeError("A run is already in progress.")
@@ -90,27 +85,12 @@ class PrettifyRunner:
         )
         self._thread.start()
 
-    def cancel(self) -> None:
-        """Attempt to terminate a running process."""
-        if self._process and self._process.poll() is None:
-            self._process.terminate()
-
     def _run_worker(
         self,
         options: PrettifyOptions,
         on_output: OutputCallback,
         on_complete: CompletionCallback,
     ) -> None:
-        path_for_cli = _path_for_cli_lookup()
-        executable = shutil.which(self.CLI_COMMAND, path=path_for_cli)
-        if executable is None:
-            on_output(
-                f"Error: '{self.CLI_COMMAND}' not found on PATH. "
-                "Make sure notion-export-prettify is installed.\n"
-            )
-            on_complete(RunResult(RunStatus.FAILED))
-            return
-
         try:
             resolved_input = self._zip_handler.resolve(options.input_file)  # type: ignore[arg-type]
         except (ZipExtractionError, ValueError) as exc:
@@ -118,81 +98,69 @@ class PrettifyRunner:
             on_complete(RunResult(RunStatus.FAILED))
             return
 
-        effective_options = PrettifyOptions(
-            input_file=resolved_input,
-            template=options.template,
-            output=options.output,
-            title=options.title,
-            subtitle=options.subtitle,
-            description=options.description,
-            project=options.project,
-            author=options.author,
-            date=options.date,
-            identifier=options.identifier,
-            cover_page=options.cover_page,
-            heading_numbers=options.heading_numbers,
-            strip_internal_info=options.strip_internal_info,
-            table_of_contents=options.table_of_contents,
-        )
+        # When no output path is given, write next to the original input file
+        # so the PDF never ends up inside a temporary extraction directory.
+        effective_output = options.output
+        if effective_output is None and options.input_file is not None:
+            effective_output = _derive_output_path(options)
 
+        stream = _TextCallback(on_output)
+        log_handler = _LogHandler(on_output)
+        log_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+
+        module_logger = logging.getLogger("bs_notion_export_prettify")
+        module_logger.addHandler(log_handler)
+        original_level = module_logger.level
+        module_logger.setLevel(logging.DEBUG)
+
+        kwargs = _build_prettify_kwargs(options, resolved_input, effective_output)
+        on_output(f"Running prettify on: {resolved_input}\n\n")
+
+        output_path: Path | None = None
         try:
-            cli_args = effective_options.to_cli_args()
-        except ValueError as exc:
+            with contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
+                output_path = prettify(**kwargs)
+        except Exception as exc:
             on_output(f"Error: {exc}\n")
             on_complete(RunResult(RunStatus.FAILED))
             return
-
-        cmd = [executable, *cli_args]
-        on_output(f"$ {' '.join(cmd)}\n\n")
-
-        return_code: int | None = None
-        try:
-            proc_env = {**os.environ, "PYTHONUTF8": "1"}
-            if sys.platform == "darwin":
-                proc_env["PATH"] = path_for_cli
-            self._process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                env=proc_env,
-            )
-            assert self._process.stdout is not None
-            for line in self._process.stdout:
-                on_output(line)
-            return_code = self._process.wait()
-        except OSError as exc:
-            on_output(f"Error launching process: {exc}\n")
-            on_complete(RunResult(RunStatus.FAILED))
-            return
         finally:
-            # Move PDF out of the temp extraction dir before it is deleted.
-            if return_code == 0 and options.output is None:
-                self._relocate_pdf(options, on_output)
+            module_logger.removeHandler(log_handler)
+            module_logger.setLevel(original_level)
             self._zip_handler.cleanup()
 
-        status = RunStatus.SUCCESS if return_code == 0 else RunStatus.FAILED
-        on_complete(RunResult(status=status, return_code=return_code))
+        if output_path is not None:
+            on_output(f"\nPDF saved to: {output_path}\n")
+        on_complete(RunResult(status=RunStatus.SUCCESS))
 
-    def _relocate_pdf(self, options: PrettifyOptions, on_output: OutputCallback) -> None:
-        """Move a PDF written into the temp extraction dir to the original input's directory.
 
-        Called only when no explicit output path was given and the run succeeded.
-        Has no effect when no temp extraction dir was created (input was already an
-        ExportBlock-*.zip or an HTML file — in that case the PDF is already in the
-        right place).
-        """
-        extraction_dir = self._zip_handler.extraction_dir
-        if extraction_dir is None or options.input_file is None:
-            return
+def _derive_output_path(options: PrettifyOptions) -> Path:
+    """Compute a sensible output path next to the original input file."""
+    assert options.input_file is not None
+    stem = options.title.strip() or options.input_file.stem
+    return options.input_file.parent / f"{stem}.pdf"
 
-        pdfs = list(extraction_dir.glob("*.pdf"))
-        if not pdfs:
-            return
 
-        destination_dir = options.input_file.parent
-        for pdf in pdfs:
-            dest = destination_dir / pdf.name
-            shutil.move(str(pdf), str(dest))
-            on_output(f"PDF saved to: {dest}\n")
+def _build_prettify_kwargs(
+    options: PrettifyOptions,
+    resolved_input: Path,
+    effective_output: Path | None,
+) -> dict[str, object]:
+    kwargs: dict[str, object] = {"input_file": str(resolved_input)}
+
+    if effective_output is not None:
+        kwargs["output"] = str(effective_output)
+    if options.template is not None:
+        kwargs["template"] = str(options.template)
+
+    for field in ("title", "subtitle", "description", "project", "author", "date", "identifier"):
+        value: str = getattr(options, field)
+        if value:
+            kwargs[field] = value
+
+    for flag in ("cover_page", "heading_numbers", "strip_internal_info", "table_of_contents"):
+        value_bool: bool | None = getattr(options, flag)
+        if value_bool is not None:
+            kwargs[flag] = value_bool
+
+    return kwargs

@@ -25,6 +25,23 @@ wheels = [
 ]
 
 [[package]]
+name = "bs-notion-export-prettify"
+version = "1.4.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "beautifulsoup4" },
+    { name = "colorama" },
+    { name = "configargparse" },
+    { name = "jinja2" },
+    { name = "playwright" },
+    { name = "pymupdf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b6/a7/9c839c7beb1535fbbc48e915b4f90f594112f31512e304d3bac86307cbd9/bs_notion_export_prettify-1.4.3.tar.gz", hash = "sha256:cb94ba5b5ecae703066a1649e99f41ffeb99c5584b16cff28c5f27c75d23099d", size = 493910, upload-time = "2026-04-04T23:22:08.157Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b4/ca/1c7300d838dbd17e3bfb8ad7207d8e27720711dd433b2cf0af750d549dc7/bs_notion_export_prettify-1.4.3-py3-none-any.whl", hash = "sha256:b3df8e1d9887987feaf3655325e741ef99695aaa8d847cb80ad6f012e81ae602", size = 25801, upload-time = "2026-04-04T23:22:09.617Z" },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -225,29 +242,12 @@ wheels = [
 ]
 
 [[package]]
-name = "notion-export-prettify"
-version = "1.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "beautifulsoup4" },
-    { name = "colorama" },
-    { name = "configargparse" },
-    { name = "jinja2" },
-    { name = "playwright" },
-    { name = "pymupdf" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/4c/8d/038713ddf6b66165fd64f4577e773b38ce548b31cce6a4e2846816da9125/notion_export_prettify-1.3.0.tar.gz", hash = "sha256:e2906cd77eaad562e48864ad71ca31165f61dee0370273fb9e27d19ab01aebdd", size = 493444, upload-time = "2025-05-09T10:26:08.458Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/a9/6715cfa92f39a7087798557b1c6dcece1dbcbc2514a00c92257dc9581c80/notion_export_prettify-1.3.0-py3-none-any.whl", hash = "sha256:62e40c454022f35c0aef6119e794dcb195c9e4bbbec4eec28dd8ce5a8259f366", size = 23592, upload-time = "2025-05-09T10:26:06.778Z" },
-]
-
-[[package]]
 name = "notion-prettify"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "bs-notion-export-prettify" },
     { name = "customtkinter" },
-    { name = "notion-export-prettify" },
 ]
 
 [package.dev-dependencies]
@@ -262,8 +262,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bs-notion-export-prettify", specifier = ">=1.4.3" },
     { name = "customtkinter", specifier = ">=5.2.2" },
-    { name = "notion-export-prettify", specifier = ">=1.3.0" },
 ]
 
 [package.metadata.requires-dev]
