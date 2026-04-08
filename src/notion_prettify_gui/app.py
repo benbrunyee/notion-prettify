@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from notion_prettify_gui import styles
 from notion_prettify_gui.models.options import PrettifyOptions
+from notion_prettify_gui.services.cfg_loader import load_cfg
 from notion_prettify_gui.services.runner import PrettifyRunner, RunResult, RunStatus
 from notion_prettify_gui.widgets.file_section import FileSection
 from notion_prettify_gui.widgets.metadata_section import MetadataSection
@@ -113,6 +115,7 @@ class App(QMainWindow):
         layout.addSpacing(16)
 
         self._file_section = FileSection()
+        self._file_section.template_changed.connect(self._on_template_changed)
         layout.addWidget(self._file_section)
         layout.addSpacing(12)
 
@@ -203,6 +206,25 @@ class App(QMainWindow):
     # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
+
+    def _on_template_changed(self, path: Path | None) -> None:
+        if path is None or path.suffix.lower() != ".cfg":
+            return
+        if not path.exists():
+            return
+        try:
+            cfg = load_cfg(path)
+        except Exception:
+            return
+
+        for field, value in cfg.metadata.items():
+            try:
+                self._metadata_section.set(field, value)
+            except KeyError:
+                pass
+
+        for field, value in cfg.controls.items():
+            self._options_section.set(field, value)
 
     def _on_run(self) -> None:
         if self._file_section.input_file is None:
