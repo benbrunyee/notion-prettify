@@ -75,6 +75,13 @@ class _TriStateToggle(QWidget):
     def value(self) -> bool | None:
         return self._state
 
+    def set(self, state: bool | None) -> None:
+        self._state = state
+        self._button.setText(_STATE_LABELS[self._state])
+        self._button.setProperty("role", _STATE_ROLES[self._state])
+        self._button.style().unpolish(self._button)
+        self._button.style().polish(self._button)
+
 
 class OptionsSection(QGroupBox):
     """Four tri-state toggles for the boolean CLI flags."""
@@ -112,3 +119,7 @@ class OptionsSection(QGroupBox):
     @property
     def table_of_contents(self) -> bool | None:
         return self._toggles["table_of_contents"].value
+
+    def set(self, field: str, value: bool | None) -> None:
+        if field in self._toggles:
+            self._toggles[field].set(value)

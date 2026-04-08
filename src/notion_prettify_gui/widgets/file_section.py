@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QFileDialog,
     QGroupBox,
@@ -80,9 +81,11 @@ class _FilePickerRow(QWidget):
 class FileSection(QGroupBox):
     """Groups the input file, output file, and template file pickers."""
 
+    template_changed = Signal(object)  # emits Path | None
+
     _ZIP_FILTER = "ZIP / HTML files (*.zip *.html);;All files (*.*)"
     _PDF_FILTER = "PDF files (*.pdf);;All files (*.*)"
-    _TEMPLATE_FILTER = "All files (*.*)"
+    _TEMPLATE_FILTER = "Config / template files (*.cfg *.toml *.yaml *.yml *.json);;All files (*.*)"
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("Files", parent)
@@ -110,7 +113,12 @@ class FileSection(QGroupBox):
             placeholder="Optional custom template / config file",
             file_filter=self._TEMPLATE_FILTER,
         )
+        self._template_row._entry.textChanged.connect(self._on_template_text_changed)
         layout.addWidget(self._template_row)
+
+    def _on_template_text_changed(self, text: str) -> None:
+        value = text.strip()
+        self.template_changed.emit(Path(value) if value else None)
 
     @property
     def input_file(self) -> Path | None:

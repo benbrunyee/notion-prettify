@@ -18,7 +18,6 @@ class PrettifyOptions:
     # Metadata
     title: str = ""
     subtitle: str = ""
-    description: str = ""
     project: str = ""
     author: str = ""
     date: str = ""
