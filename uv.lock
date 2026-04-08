@@ -26,7 +26,7 @@ wheels = [
 
 [[package]]
 name = "bs-notion-export-prettify"
-version = "1.4.3"
+version = "1.4.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -36,9 +36,9 @@ dependencies = [
     { name = "playwright" },
     { name = "pymupdf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b6/a7/9c839c7beb1535fbbc48e915b4f90f594112f31512e304d3bac86307cbd9/bs_notion_export_prettify-1.4.3.tar.gz", hash = "sha256:cb94ba5b5ecae703066a1649e99f41ffeb99c5584b16cff28c5f27c75d23099d", size = 493910, upload-time = "2026-04-04T23:22:08.157Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/03/e4/4edacb5d6f629b28665733ca9ab8a2a0391f5d93c879599377995e2f7e58/bs_notion_export_prettify-1.4.4.tar.gz", hash = "sha256:d872850943f1649c67a7d18dd1fafc448019646bf9fc594b9f653d6d841b4d8c", size = 494168, upload-time = "2026-04-08T15:26:29.809Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b4/ca/1c7300d838dbd17e3bfb8ad7207d8e27720711dd433b2cf0af750d549dc7/bs_notion_export_prettify-1.4.3-py3-none-any.whl", hash = "sha256:b3df8e1d9887987feaf3655325e741ef99695aaa8d847cb80ad6f012e81ae602", size = 25801, upload-time = "2026-04-04T23:22:09.617Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/85/ea681246642e93b8a3ffcc51cbbb1c09a2598f47a92b47a75067bbcd3e7d/bs_notion_export_prettify-1.4.4-py3-none-any.whl", hash = "sha256:d15b35eeda9634b5c8d652aa68f89e58265d9435518d9f4e322ff67f170c9c6a", size = 26124, upload-time = "2026-04-08T15:26:31.071Z" },
 ]
 
 [[package]]
@@ -240,7 +240,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bs-notion-export-prettify", specifier = ">=1.4.3" },
+    { name = "bs-notion-export-prettify", specifier = ">=1.4.4" },
     { name = "pyside6", specifier = ">=6.8.0" },
 ]
 

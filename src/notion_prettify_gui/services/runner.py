@@ -137,7 +137,16 @@ class PrettifyRunner:
 def _derive_output_path(options: PrettifyOptions) -> Path:
     """Compute a sensible output path next to the original input file."""
     assert options.input_file is not None
-    stem = options.title.strip() or options.input_file.stem
+    project = options.project.strip()
+    title = options.title.strip()
+    if project and title:
+        stem = f"{project} - {title}"
+    elif not title and project:
+        stem = project
+    elif title:
+        stem = title
+    else:
+        stem = options.input_file.stem
     return options.input_file.parent / f"{stem}.pdf"
 
 
@@ -153,12 +162,19 @@ def _build_prettify_kwargs(
     if options.template is not None:
         kwargs["template"] = str(options.template)
 
-    for field in ("title", "subtitle", "description", "project", "author", "date", "identifier"):
+    for field in ("title", "subtitle", "project", "author", "date"):
         value: str = getattr(options, field)
         if value:
             kwargs[field] = value
+    if options.identifier:
+        kwargs["identifier"] = options.identifier
 
-    for flag in ("cover_page", "heading_numbers", "strip_internal_info", "table_of_contents"):
+    for flag in (
+        "cover_page",
+        "heading_numbers",
+        "strip_internal_info",
+        "table_of_contents",
+    ):
         value_bool: bool | None = getattr(options, flag)
         if value_bool is not None:
             kwargs[flag] = value_bool

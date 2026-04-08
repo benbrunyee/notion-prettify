@@ -13,11 +13,10 @@ _METADATA_FIELDS: list[tuple[str, str, str]] = [
     # (attribute_name, label_text, placeholder)
     ("title", "Title", "Document title"),
     ("subtitle", "Subtitle", "Document subtitle"),
-    ("description", "Description", "Brief description"),
     ("project", "Project", "Project name"),
     ("author", "Author", "Author name"),
-    ("date", "Date", "e.g. 2024-01-15"),
-    ("identifier", "Identifier", "Doc identifier / number"),
+    ("date", "Date", "e.g. 8 April 2026"),
+    ("identifier", "Version", "e.g. 1.0"),
 ]
 
 
@@ -68,10 +67,6 @@ class MetadataSection(QGroupBox):
     @property
     def subtitle(self) -> str:
         return self.get("subtitle")
-
-    @property
-    def description(self) -> str:
-        return self.get("description")
 
     @property
     def project(self) -> str:

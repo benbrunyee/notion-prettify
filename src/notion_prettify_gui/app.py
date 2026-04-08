@@ -218,6 +218,8 @@ class App(QMainWindow):
             return
 
         for field, value in cfg.metadata.items():
+            if field == "description":
+                continue
             try:
                 self._metadata_section.set(field, value)
             except KeyError:
@@ -239,7 +241,6 @@ class App(QMainWindow):
             template=self._file_section.template,
             title=self._metadata_section.title,
             subtitle=self._metadata_section.subtitle,
-            description=self._metadata_section.description,
             project=self._metadata_section.project,
             author=self._metadata_section.author,
             date=self._metadata_section.date,
