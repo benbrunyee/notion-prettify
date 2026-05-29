@@ -76,7 +76,7 @@ if sys.platform == "darwin":
     app = BUNDLE(
         coll,
         name="NotionPrettify.app",
-        icon=None,
+        icon="assets/icon.png",
         bundle_identifier="com.brunyee.notion-prettify",
         info_plist={
             "CFBundleDisplayName": "Notion Prettify",
@@ -103,6 +103,7 @@ else:
         upx_exclude=[],
         runtime_tmpdir=None,
         console=False,
+        icon="assets/icon.ico",
         disable_windowed_traceback=False,
         argv_emulation=False,
         target_arch=None,
